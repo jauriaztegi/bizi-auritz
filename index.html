@@ -349,11 +349,12 @@
       name: "Subida exigente a Urkulu", 
       distKm: 42, 
       denvM: 1200, 
-      timeMin: 240, // 4h 00m
+      timeMin: 240,
       timeStr: "4h 00m",
       diff: "Dura", 
       desc: "Ruta larga de gran desnivel para piernas entrenadas. Vistas impresionantes en la cumbre.",
-      gpxUrl: "tracks/urkulu-ebike.gpx", 
+      geojsonUrl: "tracks/tracks.geojson", // Archivo GeoJSON para dibujar el mapa
+      gpxUrl: "tracks/urkulu-ebike.gpx",   // Archivo GPX para la descarga directa
       wikilocUrl: "https://loc.wiki/t/279081532?wa=sc",
       startLat: 43.030, 
       startLng: -1.240 
@@ -454,9 +455,11 @@
     document.getElementById('modalWikiloc').href = r.wikilocUrl;
     document.getElementById('modalGpx').href = r.gpxUrl;
 
+    // Mostrar el contenedor modal
     document.getElementById('modalOverlay').classList.add('active');
 
     setTimeout(() => {
+      // 1. Inicializar mapa si no existe
       if (!modalMap) {
         modalMap = L.map('modalMap');
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -464,27 +467,35 @@
           attribution: '© OpenStreetMap'
         }).addTo(modalMap);
       }
+
+      // 2. Recalcular dimensiones para quitar el fondo gris
       modalMap.invalidateSize();
 
+      // 3. Limpiar capa previa
       if (currentGpxLayer) {
         modalMap.removeLayer(currentGpxLayer);
       }
 
-      if (r.gpxUrl && r.gpxUrl !== "#") {
-        currentGpxLayer = new L.GPX(r.gpxUrl, {
-          async: true,
-          marker_options: {
-            startIconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-            endIconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
-          },
-          polyline_options: { color: '#0284c7', weight: 4, opacity: 0.8 }
-        }).on('loaded', function(e) {
-          modalMap.fitBounds(e.target.getBounds());
-        }).on('error', function() {
-          modalMap.setView([r.startLat, r.startLng], 12);
-          currentGpxLayer = L.marker([r.startLat, r.startLng]).addTo(modalMap);
-        }).addTo(modalMap);
+      // 4. Cargar GeoJSON si existe
+      if (r.geojsonUrl) {
+        fetch(r.geojsonUrl)
+          .then(res => {
+            if (!res.ok) throw new Error("No se encontró el GeoJSON");
+            return res.json();
+          })
+          .then(geojsonData => {
+            currentGpxLayer = L.geoJSON(geojsonData, {
+              style: { color: '#0284c7', weight: 4, opacity: 0.8 }
+            }).addTo(modalMap);
+
+            // Centrar mapa automáticamente sobre el trazado
+            modalMap.fitBounds(currentGpxLayer.getBounds());
+          })
+          .catch(err => {
+            console.error(err);
+            modalMap.setView([r.startLat, r.startLng], 12);
+            currentGpxLayer = L.marker([r.startLat, r.startLng]).addTo(modalMap);
+          });
       } else {
         modalMap.setView([r.startLat, r.startLng], 12);
         currentGpxLayer = L.marker([r.startLat, r.startLng]).addTo(modalMap);
