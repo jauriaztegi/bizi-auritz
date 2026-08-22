@@ -1,90 +1,505 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-
-<title>Rutas Bici Burguete</title>
+<meta charset="UTF-8">
+<title>bizi-auritz | Rutas BTT Burguete</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; background: #f4f4f9; }
-  header { background: #2c3e50; color: white; padding: 15px; text-align: center; font-size: 1.2rem; font-weight: bold; }
-  #filters { padding: 12px; background: white; display: flex; gap: 10px; flex-wrap: wrap; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-  select { padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9rem; flex: 1; }
-  #map { height: 250px; width: 100%; }
-  .route-list { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
-  .card { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-  .card h3 { margin: 0 0 8px 0; font-size: 1.1rem; color: #1a252f; }
-  .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; background: #e0e0e0; }
-  .badge.facil { background: #2ecc71; color: white; }
-  .badge.media { background: #f39c12; color: white; }
-  .badge.dura { background: #e74c3c; color: white; }
-  .metrics { margin-top: 8px; font-size: 0.9rem; color: #555; display: flex; gap: 15px; }
+  * { box-sizing: border-box; }
+  body { 
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+    margin: 0; 
+    padding: 0; 
+    background: #f4f6f8; 
+    color: #333;
+  }
+  
+  header { 
+    background: #1e293b; 
+    color: white; 
+    padding: 16px; 
+    text-align: center; 
+    font-size: 1.3rem; 
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  /* BARRA DE FILTROS */
+  .filters-container { 
+    padding: 12px; 
+    background: #ffffff; 
+    display: flex; 
+    gap: 8px; 
+    flex-wrap: wrap; 
+    border-bottom: 1px solid #e2e8f0;
+  }
+  
+  .filter-group {
+    flex: 1 1 calc(50% - 6px);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .filter-group label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+  }
+
+  select { 
+    width: 100%;
+    padding: 8px 10px; 
+    border-radius: 6px; 
+    border: 1px solid #cbd5e1; 
+    font-size: 0.85rem; 
+    background-color: #f8fafc;
+    color: #334155;
+    outline: none;
+  }
+  select:focus {
+    border-color: #3b82f6;
+  }
+
+  /* MAPA PRINCIPAL */
+  #map { 
+    height: 220px; 
+    width: 100%; 
+    z-index: 1;
+  }
+
+  /* LISTADO DE RUTAS */
+  .route-list { 
+    padding: 12px; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 12px; 
+  }
+
+  .card { 
+    background: white; 
+    border-radius: 10px; 
+    padding: 14px; 
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); 
+    border: 1px solid #e2e8f0;
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+  }
+  .card:active {
+    transform: scale(0.99);
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .card h3 { 
+    margin: 0; 
+    font-size: 1.05rem; 
+    color: #0f172a; 
+    font-weight: 600;
+  }
+
+  .badge { 
+    display: inline-block; 
+    padding: 3px 8px; 
+    border-radius: 12px; 
+    font-size: 0.75rem; 
+    font-weight: 700; 
+    white-space: nowrap;
+  }
+  .badge.facil { background: #dcfce7; color: #166534; }
+  .badge.media { background: #fef9c3; color: #854d0e; }
+  .badge.dura { background: #fee2e2; color: #991b1b; }
+
+  .metrics { 
+    display: flex; 
+    gap: 12px; 
+    font-size: 0.85rem; 
+    color: #475569; 
+    margin-bottom: 10px;
+  }
+  .metrics span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .btn-detail {
+    width: 100%;
+    background: #f1f5f9;
+    color: #334155;
+    border: none;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  /* MODAL / FICHA DETALLADA DE RUTA */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    display: none;
+    justify-content: center;
+    align-items: flex-end;
+    z-index: 1000;
+  }
+  .modal-overlay.active {
+    display: flex;
+  }
+
+  .modal-content {
+    background: white;
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    overflow-y: auto;
+    padding: 20px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.2);
+    animation: slideUp 0.25s ease-out;
+    position: relative;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: #e2e8f0;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #475569;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #modalMap {
+    height: 220px;
+    width: 100%;
+    border-radius: 8px;
+    margin: 15px 0;
+    z-index: 1;
+  }
+
+  .modal-links {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .btn-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-align: center;
+  }
+  .btn-wikiloc { background: #ff6b00; color: white; }
+  .btn-gpx { background: #0284c7; color: white; }
+
+  .no-routes {
+    text-align: center;
+    padding: 30px;
+    color: #64748b;
+    font-size: 0.95rem;
+  }
 </style>
 </head>
 <body>
 
-<header>Rutas Bici Burguete</header>
+<header>bizi-auritz 🚴‍♂️</header>
 
-<div id="filters">
-  <select id="diffFilter" onchange="filterRoutes()">
-    <option value="all">Toda Dificultad</option>
-    <option value="Fácil">Fácil</option>
-    <option value="Media">Media</option>
-    <option value="Dura">Dura</option>
-  </select>
+<!-- BARRA DE FILTROS COMPLETA -->
+<div class="filters-container">
+  <div class="filter-group">
+    <label>Dificultad</label>
+    <select id="diffFilter" onchange="filterRoutes()">
+      <option value="all">Todas</option>
+      <option value="Fácil">Fácil</option>
+      <option value="Media">Media</option>
+      <option value="Dura">Dura</option>
+    </select>
+  </div>
+
+  <div class="filter-group">
+    <label>Distancia</label>
+    <select id="distFilter" onchange="filterRoutes()">
+      <option value="all">Cualquiera</option>
+      <option value="short">< 20 km</option>
+      <option value="medium">20 - 40 km</option>
+      <option value="long">> 40 km</option>
+    </select>
+  </div>
+
+  <div class="filter-group">
+    <label>Desnivel</label>
+    <select id="denvFilter" onchange="filterRoutes()">
+      <option value="all">Cualquiera</option>
+      <option value="low">< 500 m</option>
+      <option value="mid">500 - 1000 m</option>
+      <option value="high">> 1000 m</option>
+    </select>
+  </div>
+
+  <div class="filter-group">
+    <label>Tiempo</label>
+    <select id="timeFilter" onchange="filterRoutes()">
+      <option value="all">Cualquiera</option>
+      <option value="short">< 2h</option>
+      <option value="medium">2h - 3h30m</option>
+      <option value="long">> 3h30m</option>
+    </select>
+  </div>
 </div>
 
+<!-- MAPA GENERAL -->
 <div id="map"></div>
 
+<!-- LISTADO -->
 <div class="route-list" id="routeList"></div>
 
+<!-- FICHA DETALLADA (MODAL) -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <h2 id="modalTitle" style="margin-top:0; color:#0f172a;"></h2>
+    <div id="modalBadges" style="margin-bottom: 10px;"></div>
+    <div class="metrics" id="modalMetrics"></div>
+    <p id="modalDesc" style="color:#334155; line-height:1.5; font-size:0.95rem;"></p>
+    
+    <!-- Mapa individual para visualizar la ruta -->
+    <div id="modalMap"></div>
+
+    <div class="modal-links">
+      <a id="modalWikiloc" href="#" target="_blank" class="btn-link btn-wikiloc">🔗 Ver ruta en Wikiloc</a>
+      <a id="modalGpx" href="#" download class="btn-link btn-gpx">📥 Descargar archivo GPX</a>
+    </div>
+  </div>
+</div>
+
+<!-- Leaflet JS & GPX Plugin -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js"></script>
+
 <script>
-  // Datos de las rutas (Aquí vas añadiendo tus rutas)
+  // DATOS DE LAS RUTAS
   const routes = [
-    { name: "Vuelta a Lindus", dist: "28 km", denv: "+750 m", time: "2h 30m", diff: "Media", gpx: "https://wikiloc.com", lat: 43.003, lng: -1.334 },
-    { name: "Paseo Garralda - Aribe", dist: "15 km", denv: "+250 m", time: "1h 15m", diff: "Fácil", gpx: "#", lat: 42.980, lng: -1.283 },
-    { name: "Subida a Urkulu", dist: "42 km", denv: "+1200 m", time: "4h 00m", diff: "Dura", gpx: "#", lat: 43.030, lng: -1.240 }
+    { 
+      id: 1,
+      name: "Vuelta a Lindus y Hayedos", 
+      distKm: 28, 
+      denvM: 750, 
+      timeMin: 150, // en minutos (2h 30m)
+      timeStr: "2h 30m",
+      diff: "Media", 
+      desc: "Precioso recorrido por los bosques de hayedos rodeando la zona de Lindus. Pistas buenas con algún tramo algo más técnico de bajada.",
+      gpxUrl: "tracks/lindus.gpx", 
+      wikilocUrl: "https://es.wikiloc.com/",
+      startLat: 43.003, 
+      startLng: -1.334 
+    },
+    { 
+      id: 2,
+      name: "Paseo Garralda y Aribe", 
+      distKm: 15, 
+      denvM: 250, 
+      timeMin: 75, // 1h 15m
+      timeStr: "1h 15m",
+      diff: "Fácil", 
+      desc: "Ruta rápida y rodadora ideal para calentar o para días con poco tiempo. Sin grandes pendientes.",
+      gpxUrl: "tracks/garralda.gpx", 
+      wikilocUrl: "https://es.wikiloc.com/",
+      startLat: 42.980, 
+      startLng: -1.283 
+    },
+    { 
+      id: 3,
+      name: "Subida exigente a Urkulu", 
+      distKm: 42, 
+      denvM: 1200, 
+      timeMin: 240, // 4h 00m
+      timeStr: "4h 00m",
+      diff: "Dura", 
+      desc: "Ruta larga de gran desnivel para piernas entrenadas. Vistas impresionantes en la cumbre.",
+      gpxUrl: "tracks/urkulu.gpx", 
+      wikilocUrl: "https://es.wikiloc.com/",
+      startLat: 43.030, 
+      startLng: -1.240 
+    }
   ];
 
-  // Inicializar mapa centrado en Burguete
-  const map = L.map('map').setView([42.989, -1.334], 11);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap'
-  }).addTo(map);
+  let mainMap, modalMap, currentGpxLayer, mainMarkers = [];
+
+  function initMainMap() {
+    mainMap = L.map('map').setView([42.989, -1.334], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(mainMap);
+  }
+
+  function filterRoutes() {
+    const diff = document.getElementById('diffFilter').value;
+    const dist = document.getElementById('distFilter').value;
+    const denv = document.getElementById('denvFilter').value;
+    const time = document.getElementById('timeFilter').value;
+
+    const filtered = routes.filter(r => {
+      if (diff !== 'all' && r.diff !== diff) return false;
+
+      if (dist === 'short' && r.distKm >= 20) return false;
+      if (dist === 'medium' && (r.distKm < 20 || r.distKm > 40)) return false;
+      if (dist === 'long' && r.distKm <= 40) return false;
+
+      if (denv === 'low' && r.denvM >= 500) return false;
+      if (denv === 'mid' && (r.denvM < 500 || r.denvM > 1000)) return false;
+      if (denv === 'high' && r.denvM <= 1000) return false;
+
+      if (time === 'short' && r.timeMin >= 120) return false;
+      if (time === 'medium' && (r.timeMin < 120 || r.timeMin > 210)) return false;
+      if (time === 'long' && r.timeMin <= 210) return false;
+
+      return true;
+    });
+
+    renderRoutes(filtered);
+  }
 
   function renderRoutes(data) {
     const list = document.getElementById('routeList');
     list.innerHTML = '';
-    data.forEach(r => {
-      // Marcador en mapa
-      L.marker([r.lat, r.lng]).addTo(map).bindPopup(`<b>${r.name}</b><br>${r.dist} | ${r.denv}`);
 
-      // Tarjeta de la ruta
+    mainMarkers.forEach(m => mainMap.removeLayer(m));
+    mainMarkers = [];
+
+    if (data.length === 0) {
+      list.innerHTML = '<div class="no-routes">No hay rutas que coincidan con estos filtros.</div>';
+      return;
+    }
+
+    data.forEach(r => {
+      const marker = L.marker([r.startLat, r.startLng])
+        .addTo(mainMap)
+        .bindPopup(`<b>${r.name}</b><br>${r.distKm} km | +${r.denvM} m<br><a href="#" onclick="openModal(${r.id}); return false;">Ver ficha</a>`);
+      mainMarkers.push(marker);
+
       const card = document.createElement('div');
       card.className = 'card';
+      card.onclick = () => openModal(r.id);
+
       const diffClass = r.diff.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
       card.innerHTML = `
-        <h3>${r.name} <span class="badge ${diffClass}">${r.diff}</span></h3>
-        <div class="metrics">
-          <span>📏 ${r.dist}</span>
-          <span>⛰️ ${r.denv}</span>
-          <span>⏱️ ${r.time}</span>
+        <div class="card-header">
+          <h3>${r.name}</h3>
+          <span class="badge ${diffClass}">${r.diff}</span>
         </div>
+        <div class="metrics">
+          <span>📏 ${r.distKm} km</span>
+          <span>⛰️ +${r.denvM} m</span>
+          <span>⏱️ ${r.timeStr}</span>
+        </div>
+        <button class="btn-detail">Ver ficha y track</button>
       `;
       list.appendChild(card);
     });
   }
 
-  function filterRoutes() {
-    const diff = document.getElementById('diffFilter').value;
-    const filtered = routes.filter(r => diff === 'all' || r.diff === diff);
-    renderRoutes(filtered);
+  function openModal(id) {
+    const r = routes.find(item => item.id === id);
+    if (!r) return;
+
+    document.getElementById('modalTitle').innerText = r.name;
+    const diffClass = r.diff.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    document.getElementById('modalBadges').innerHTML = `<span class="badge ${diffClass}">${r.diff}</span>`;
+    document.getElementById('modalMetrics').innerHTML = `
+      <span>📏 ${r.distKm} km</span>
+      <span>⛰️ +${r.denvM} m</span>
+      <span>⏱️ ${r.timeStr}</span>
+    `;
+    document.getElementById('modalDesc').innerText = r.desc;
+
+    document.getElementById('modalWikiloc').href = r.wikilocUrl;
+    document.getElementById('modalGpx').href = r.gpxUrl;
+
+    document.getElementById('modalOverlay').classList.add('active');
+
+    setTimeout(() => {
+      if (!modalMap) {
+        modalMap = L.map('modalMap');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap'
+        }).addTo(modalMap);
+      }
+      modalMap.invalidateSize();
+
+      if (currentGpxLayer) {
+        modalMap.removeLayer(currentGpxLayer);
+      }
+
+      if (r.gpxUrl && r.gpxUrl !== "#") {
+        currentGpxLayer = new L.GPX(r.gpxUrl, {
+          async: true,
+          marker_options: {
+            startIconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+            endIconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
+          },
+          polyline_options: { color: '#0284c7', weight: 4, opacity: 0.8 }
+        }).on('loaded', function(e) {
+          modalMap.fitBounds(e.target.getBounds());
+        }).on('error', function() {
+          modalMap.setView([r.startLat, r.startLng], 12);
+          currentGpxLayer = L.marker([r.startLat, r.startLng]).addTo(modalMap);
+        }).addTo(modalMap);
+      } else {
+        modalMap.setView([r.startLat, r.startLng], 12);
+        currentGpxLayer = L.marker([r.startLat, r.startLng]).addTo(modalMap);
+      }
+    }, 200);
   }
 
-  renderRoutes(routes);
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('active');
+  }
+
+  window.onload = () => {
+    initMainMap();
+    renderRoutes(routes);
+  };
 </script>
 </body>
 </html>
