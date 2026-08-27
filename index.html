@@ -322,7 +322,7 @@
       distKm: 23, 
       denvM: 635, 
       timeMin: 158, // en minutos
-      timeStr: "2h 38m",
+      timeStr: "2h 38m BTT",
       diff: "Fácil", 
       desc: "Precioso recorrido por los bosques de hayedos en la zona de Xuringua e Irupagoeta . Pistas buenas con algún tramo algo más técnico y divertido de bajada.",
      geojsonUrl: "tracks/SenderoMendiaundiTresHayas.geojson", // Archivo GeoJSON para dibujar el mapa 
@@ -352,7 +352,7 @@
       distKm: 42, 
       denvM: 1200, 
       timeMin: 240,
-      timeStr: "4h 00m",
+      timeStr: "4h 00m eBike",
       diff: "Dura", 
       desc: "Ruta larga de gran desnivel para piernas entrenadas. Vistas impresionantes en la cumbre.",
       geojsonUrl: "tracks/urkulu-ebike.geojson", // Archivo GeoJSON para dibujar el mapa
@@ -367,7 +367,7 @@
       distKm: 36, 
       denvM: 975, 
       timeMin: 200,
-      timeStr: "3h 20m",
+      timeStr: "3h 20m BTT",
       diff: "Media",     // Fácil, Media o Dura
       desc: "Ruta desde Burguete subiendo hacia Corona desde Garralda. La bajada se hace hasta Arrieta y por carretera, pasando por Lusarreta, se coge la Senda de la Calzada Romana hasta el Camping de Espinal.",
       geojsonUrl: "tracks/Corona.geojson", // Archivo GeoJSON para dibujar el mapa
@@ -430,45 +430,72 @@
     renderRoutes(filtered);
   }
 
-  function renderRoutes(data) {
-    const list = document.getElementById('routeList');
-    list.innerHTML = '';
+function renderRoutes(data) {
+  const list = document.getElementById('routeList');
+  list.innerHTML = '';
 
-    mainMarkers.forEach(m => mainMap.removeLayer(m));
-    mainMarkers = [];
+  // 1. Limpiar marcadores y tracks anteriores del mapa principal
+  mainMarkers.forEach(m => mainMap.removeLayer(m));
+  mainMarkers = [];
 
-    if (data.length === 0) {
-      list.innerHTML = '<div class="no-routes">No hay rutas que coincidan con estos filtros.</div>';
-      return;
+  if (data.length === 0) {
+    list.innerHTML = '<div class="no-routes">No hay rutas que coincidan con estos filtros.</div>';
+    return;
+  }
+
+  // Grupo para calcular el encuadre global de todas las rutas
+  const boundsGroup = L.featureGroup();
+
+  data.forEach(r => {
+    // 2. Crear marcador
+    const marker = L.marker([r.startLat, r.startLng])
+      .bindPopup(`<b>${r.name}</b><br>${r.distKm} km | +${r.denvM} m<br><a href="#" onclick="openModal(${r.id}); return false;">Ver ficha</a>`);
+    
+    marker.addTo(mainMap);
+    mainMarkers.push(marker);
+    boundsGroup.addLayer(marker);
+
+    // 3. Cargar y pintar el track GeoJSON en el mapa principal
+    if (r.geojsonUrl) {
+      fetch(r.geojsonUrl)
+        .then(res => res.json())
+        .then(geojsonData => {
+          const trackLayer = L.geoJSON(geojsonData, {
+            style: { color: '#0284c7', weight: 3, opacity: 0.7 }
+          }).addTo(mainMap);
+
+          // Guardar capa para limpiarla cuando se apliquen filtros
+          mainMarkers.push(trackLayer);
+          boundsGroup.addLayer(trackLayer);
+
+          // Ajustar zoom para mostrar todas las rutas activas
+          mainMap.fitBounds(boundsGroup.getBounds(), { padding: [20, 20] });
+        })
+        .catch(err => console.error(`Error cargando track de ${r.name}:`, err));
     }
 
-    data.forEach(r => {
-      const marker = L.marker([r.startLat, r.startLng])
-        .addTo(mainMap)
-        .bindPopup(`<b>${r.name}</b><br>${r.distKm} km | +${r.denvM} m<br><a href="#" onclick="openModal(${r.id}); return false;">Ver ficha</a>`);
-      mainMarkers.push(marker);
+    // 4. Crear tarjeta en el listado
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.onclick = () => openModal(r.id);
 
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.onclick = () => openModal(r.id);
+    const diffClass = r.diff.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-      const diffClass = r.diff.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-      card.innerHTML = `
-        <div class="card-header">
-          <h3>${r.name}</h3>
-          <span class="badge ${diffClass}">${r.diff}</span>
-        </div>
-        <div class="metrics">
-          <span>📏 ${r.distKm} km</span>
-          <span>⛰️ +${r.denvM} m</span>
-          <span>⏱️ ${r.timeStr}</span>
-        </div>
-        <button class="btn-detail">Ver ficha y track</button>
-      `;
-      list.appendChild(card);
-    });
-  }
+    card.innerHTML = `
+      <div class="card-header">
+        <h3>${r.name}</h3>
+        <span class="badge ${diffClass}">${r.diff}</span>
+      </div>
+      <div class="metrics">
+        <span>📏 ${r.distKm} km</span>
+        <span>⛰️ +${r.denvM} m</span>
+        <span>⏱️ ${r.timeStr}</span>
+      </div>
+      <button class="btn-detail">Ver ficha y track</button>
+    `;
+    list.appendChild(card);
+  });
+}
 
   function openModal(id) {
     const r = routes.find(item => item.id === id);
